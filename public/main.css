@@ -247,13 +247,15 @@ u {
 }
 
 .game-grid {
+  --bg-opacity: 0.5;
+
   list-style: none;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(var(--grid-size), 1fr);
   border: 1px solid currentColor;
   position: relative;
-  background-color: color(from var(--surface) srgb r g b / 0.5);
+  background-color: color(from var(--surface) srgb r g b / var(--bg-opacity));
   backdrop-filter: blur(4px);
 
   &:not(:first-of-type) {
@@ -396,4 +398,10 @@ u {
   margin: auto;
   width: max-content;
   height: max-content;
+}
+
+@-moz-document url-prefix() {
+  .game-grid {
+    --bg-opacity: 0.8;
+  }
 }
