@@ -7,13 +7,12 @@
     "allowJs": true,
     "strict": true,
     "noEmit": true,
-    "lib": ["DOM", "DOM.Iterable", "ES2024"],
-    "types": ["jquery", "seedrandom", "index.d.ts"],
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ES2024"
+    ],
     "skipLibCheck": true,
-    "baseUrl": "./",
-    "paths": {
-      "https://cdn.jsdelivr.net/npm/dayjs@1.11.13/+esm": ["./node_modules/dayjs/index.d.ts"],
-      "$/*": ["./public/js/*", "./public/data/*"]
-    }
+    "baseUrl": "./"
   }
 }
