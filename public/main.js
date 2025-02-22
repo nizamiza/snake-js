@@ -225,6 +225,8 @@ function moveHead() {
 		position[1] = 0;
 	}
 
+	let atePoint = get(point, ...position);
+
 	Game.snakePreviousPosition[0] = position[0];
 	Game.snakePreviousPosition[1] = position[1];
 
@@ -249,7 +251,7 @@ function moveHead() {
 
 	set(snake, ...position, true, "snake");
 
-	const atePoint = get(point, ...position);
+	atePoint ||= get(point, ...position);
 
 	if (atePoint) {
 		set(point, ...position, false, "snake");
