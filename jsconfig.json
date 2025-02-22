@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "ESNext",
+    "moduleResolution": "NodeNext",
+    "checkJs": true,
+    "allowJs": true,
+    "strict": true,
+    "noEmit": true,
+    "lib": ["DOM", "DOM.Iterable", "ES2024"],
+    "types": ["jquery", "seedrandom", "index.d.ts"],
+    "skipLibCheck": true,
+    "baseUrl": "./",
+    "paths": {
+      "https://cdn.jsdelivr.net/npm/dayjs@1.11.13/+esm": ["./node_modules/dayjs/index.d.ts"],
+      "$/*": ["./public/js/*", "./public/data/*"]
+    }
+  }
+}
