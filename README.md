@@ -45,9 +45,7 @@ This is a 3D snake game implemented in JavaScript, HTML, and CSS. The game featu
 
 ## Future Improvements
 
-* Add game difficulty settings.
 * Optimize the `spawnPoint` function.
-* Implement more advanced input handling.
 
 ---
 

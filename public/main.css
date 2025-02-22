@@ -17,6 +17,7 @@ body {
   -webkit-font-smoothing: antialiased;
   color-scheme: light dark;
   color: var(--text);
+  touch-action: none;
   background-color: var(--surface);
   display: flex;
   flex-direction: column;
@@ -182,6 +183,11 @@ footer {
   margin-inline: auto;
   text-align: center;
   padding-inline: 1rem;
+  font-size: 0.75rem;
+
+  @media (min-width: 600px) {
+    font-size: 1rem;
+  }
 }
 
 p {
@@ -208,6 +214,14 @@ u {
   text-decoration-skip-ink: none;
 }
 
+.tutorial {
+  font-size: 0.75rem;
+
+  @media (min-width: 600px) {
+    font-size: 1rem;
+  }
+}
+
 #high-score-info {
   color: color(from currentColor xyz x calc(y + 0.08) z);
 
@@ -228,6 +242,7 @@ u {
 
   position: relative;
   transform-style: preserve-3d;
+  user-select: none;
 }
 
 .game-grid {

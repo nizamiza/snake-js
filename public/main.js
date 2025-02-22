@@ -1,7 +1,8 @@
-const GRID_SIZE = 20;
+const GRID_SIZE = 24;
 const UINT_ARRAY_SIZE = (GRID_SIZE * GRID_SIZE) / 8;
-const TICK_TIMEOUT = 80;
 const ROTATION_DURATION = 500;
+const MAX_INPUT_QUEUE_SIZE = 5;
+const SWIPE_THRESHOLD = 4;
 
 const MaxPointIncreaseThreshold = new Set([7, 20, 42, 80, 120, 200]);
 
@@ -23,12 +24,16 @@ const point = new Uint8Array(UINT_ARRAY_SIZE);
 Game.isRunning = false;
 Game.isPaused = false;
 Game.isOver = false;
-Game.inputBlockTimeoutId = -1;
 Game.frameTimeoutId = -1;
 Game.frameId = -1;
+Game.rotationTimeoutId = -1;
 Game.direction = TOP;
 Game.pointCount = 0;
 Game.maxPointCount = 1;
+Game.tickRate = 200;
+
+/** @type {string[]} */
+Game.inputQueue = [];
 
 /** @type {[x: number, y: number][]} */
 Game.snakePositions = [];
@@ -36,12 +41,20 @@ Game.snakePositions = [];
 /** @type {[x: number, y: number]} */
 Game.snakePreviousPosition = [0, 0];
 
+/** @type {[x: number, y: number]} */
+Game.touchStart= [0, 0];
+
+/** @type {[x: number, y: number]} */
+Game.touchEnd = [0, 0];
+
 /**
  * @returns {void}
  */
 function Game() {
 	clear();
 
+	Game.inputQueue = [];
+	Game.tickRate = 200;
 	Game.isOver = false;
 	Game.direction = TOP;
 	Game.pointCount = 0;
@@ -63,17 +76,16 @@ function cancelFrame() {
 	cancelAnimationFrame(Game.frameId);
 
 	clearTimeout(Game.frameTimeoutId);
-	clearTimeout(Game.inputBlockTimeoutId);
 
 	Game.frameId = -1;
 	Game.frameTimeoutId = -1;
-	Game.inputBlockTimeoutId = -1;
 }
 
 /**
  * @returns {void}
  */
 function tick() {
+	processInput();
 	update();
 
 	if (Game.isOver) {
@@ -102,7 +114,53 @@ function tick() {
 
 	Game.frameTimeoutId = setTimeout(() => {
 		Game.frameId = requestAnimationFrame(tick);
-	}, TICK_TIMEOUT);
+	}, Game.tickRate);
+}
+
+/**
+ * @returns {void}
+ */
+function processInput() {
+	const input = Game.inputQueue.shift();
+
+	switch (input) {
+		case "Escape":
+			toggleGame(false);
+			break;
+		case "ArrowUp":
+		case "KeyW":
+			if (Game.direction !== BOTTOM) {
+				Game.direction = TOP;
+			}
+			break;
+		case "ArrowRight":
+		case "KeyD":
+			if (Game.direction !== LEFT) {
+				Game.direction = RIGHT;
+			}
+			break;
+		case "ArrowDown":
+		case "KeyS":
+			if (Game.direction !== TOP) {
+				Game.direction = BOTTOM;
+			}
+			break;
+		case "ArrowLeft":
+		case "KeyA":
+			if (Game.direction !== RIGHT) {
+				Game.direction = LEFT;
+			}
+			break;
+		case "KeyP":
+			if (Game.isPaused) {
+				Game.frameId = requestAnimationFrame(tick);
+				Game.isPaused = false;
+			} else {
+				cancelFrame();
+				Game.isPaused = true;
+			}
+			break;
+	}
 }
 
 /**
@@ -111,11 +169,9 @@ function tick() {
 function update() {
 	move();
 
-	if (Game.isOver) {
-		return;
+	if (!Game.isOver) {
+		spawnPoint();
 	}
-
-	spawnPoint();
 }
 
 /**
@@ -136,6 +192,7 @@ function move() {
 		}
 
 		Game.pointCount--;
+		Game.tickRate = Math.max(60, Game.tickRate - 10);
 	}
 }
 
@@ -270,6 +327,10 @@ function spawnPoint() {
  * @returns {void}
  */
 function rotate(side) {
+	if (Game.rotationTimeoutId > 0) {
+		return;
+	}
+
 	cube.style.transition = `transform ease-in ${ROTATION_DURATION}ms`;
 
 	switch (side) {
@@ -299,10 +360,12 @@ function rotate(side) {
 			break;
 	}
 
-	setTimeout(() => {
+	Game.rotationTimeoutId = setTimeout(() => {
 		cube.style.transformOrigin = "center"
 		cube.style.transition = "";
 		cube.style.transform = "";
+
+		Game.rotationTimeoutId = -1;
 	}, ROTATION_DURATION * 1.15);
 }
 
@@ -316,15 +379,6 @@ function clear() {
 			set(point, x, y, false, "point");
 		}
 	}
-}
-
-/**
- * @returns {void}
- */
-function blockInput() {
-	Game.inputBlockTimeoutId = setTimeout(() => {
-		Game.inputBlockTimeoutId = -1;
-	}, TICK_TIMEOUT * 0.5);
 }
 
 /**
@@ -393,7 +447,28 @@ function toggleGame(toggle) {
 }
 
 /**
- * Setup HTML
+ * @returns {string | null}
+ */
+function processSwipe() {
+	const [startX, startY] = Game.touchStart;
+	const [endX, endY] = Game.touchEnd;
+
+	const deltaX = endX - startX;
+	const deltaY = endY - startY;
+
+	if (Math.abs(deltaX) <= SWIPE_THRESHOLD && Math.abs(deltaY) <= SWIPE_THRESHOLD) {
+		return null;
+	}
+
+	if (Math.abs(deltaX) > Math.abs(deltaY)) {
+		return deltaX > 0 ? "ArrowRight" : "ArrowLeft";
+	}
+
+	return deltaY > 0 ? "ArrowDown" : "ArrowUp";
+}
+
+/**
+ * Setup HTML & listeners
  */
 const gameOverDialog = /** @type {HTMLDialogElement} */ (document.getElementById("game-over-dialog"));
 const highScore = /** @type {HTMLElement} */ (document.getElementById("high-score"));
@@ -408,7 +483,7 @@ startButton.textContent = "Start";
 
 cube.innerHTML = "";
 cube.style.setProperty("--grid-size", GRID_SIZE.toString());
-cube.style.setProperty("--cell-size", `${(1 + 8 / GRID_SIZE).toFixed(2)}rem`);
+cube.style.setProperty("--cell-size", "1.25rem");
 
 for (let i = 0; i <= BACK_SIDE; i++) {
 	const grid = document.createElement("ol");
@@ -453,56 +528,33 @@ document.addEventListener("keydown", (event) => {
 				toggleGame(true);
 				break;
 			case "KeyR":
-				side = (side + 1) % 6;
-				rotate(side);
+				if (Game.rotationTimeoutId < 0) {
+					side = Math.max((side + 1) % 3, 1);
+					rotate(side);
+				}
+
 				break;
 		}
 
 		return;
 	}
 
-	if (Game.inputBlockTimeoutId > 0) {
+	Game.inputQueue.unshift(event.code);
+});
+
+document.addEventListener("touchstart", (event) => {
+	Game.touchStart = [event.touches[0].clientX, event.touches[0].clientY];
+});
+
+document.addEventListener("touchmove", (event) => {
+	if (!Game.isRunning) {
 		return;
 	}
 
-	switch (event.code) {
-		case "Escape":
-			toggleGame(false);
-			break;
-		case "ArrowUp":
-		case "KeyW":
-			if (Game.direction !== BOTTOM) {
-				Game.direction = TOP;
-			}
-			break;
-		case "ArrowRight":
-		case "KeyD":
-			if (Game.direction !== LEFT) {
-				Game.direction = RIGHT;
-			}
-			break;
-		case "ArrowDown":
-		case "KeyS":
-			if (Game.direction !== TOP) {
-				Game.direction = BOTTOM;
-			}
-			break;
-		case "ArrowLeft":
-		case "KeyA":
-			if (Game.direction !== RIGHT) {
-				Game.direction = LEFT;
-			}
-			break;
-		case "KeyP":
-			if (Game.isPaused) {
-				Game.frameId = requestAnimationFrame(tick);
-				Game.isPaused = false;
-			} else {
-				cancelFrame();
-				Game.isPaused = true;
-			}
-			break;
-	}
+	Game.touchEnd = [event.touches[0].clientX, event.touches[0].clientY];
+	const input = processSwipe();
 
-	blockInput();
+	if (input) {
+		Game.inputQueue = [input];
+	}
 });
