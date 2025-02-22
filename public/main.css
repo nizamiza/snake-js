@@ -208,10 +208,10 @@ u {
   text-decoration-skip-ink: none;
 }
 
-#last-score-info {
+#high-score-info {
   color: color(from currentColor xyz x calc(y + 0.08) z);
 
-  &:has(#last-score:empty) {
+  &:has(#high-score:empty) {
     display: none;
   }
 }
@@ -221,7 +221,9 @@ u {
 }
 
 .cube {
-  --z-offset: min(32rem, 90vw);
+  --grid-size: 16;
+  --cell-size: 1rem;
+  --z-offset: min(var(--grid-size) * var(--cell-size), 90vw);
   --z-offset-reversed: calc(-1 * var(--z-offset));
 
   position: relative;
@@ -229,16 +231,14 @@ u {
 }
 
 .game-grid {
-  --col-count: 32;
-
   list-style: none;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(var(--col-count), 1fr);
+  grid-template-columns: repeat(var(--grid-size), 1fr);
   border: 1px solid currentColor;
   position: relative;
   background-color: color(from var(--surface) srgb r g b / 0.5);
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(4px);
 
   &:not(:first-of-type) {
     top: 0;
@@ -278,10 +278,10 @@ u {
 
   > li {
     aspect-ratio: 1;
-    width: clamp(4px, (100vw - 2rem) / var(--col-count), 1rem);
+    width: clamp(4px, (100vw - 2rem) / var(--grid-size), var(--cell-size));
     border: 0.5px solid color(from currentColor srgb r g b / 0.2);
     background-color: transparent;
-    transition: background-color ease-in-out 0.5s;
+    transition: background-color ease-out 0.5s;
 
     &[data-snake="head"] {
       --radius: 25%;

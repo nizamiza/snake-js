@@ -1,8 +1,9 @@
-const GRID_SIZE = 32;
+const GRID_SIZE = 20;
 const UINT_ARRAY_SIZE = (GRID_SIZE * GRID_SIZE) / 8;
-const TICK_TIMEOUT = 200;
+const TICK_TIMEOUT = 80;
+const ROTATION_DURATION = 500;
 
-const MaxPointIncreaseThreshold = new Set([5, 10, 20, 30, 50, 75]);
+const MaxPointIncreaseThreshold = new Set([7, 20, 42, 80, 120, 200]);
 
 const TOP = 0;
 const RIGHT = 1;
@@ -39,7 +40,6 @@ Game.snakePreviousPosition = [0, 0];
  * @returns {void}
  */
 function Game() {
-	console.info("Starting the game...");
 	clear();
 
 	Game.isOver = false;
@@ -75,29 +75,27 @@ function cancelFrame() {
  */
 function tick() {
 	update();
-	render();
 
 	if (Game.isOver) {
 		cancelFrame();
-		clear();
 
-		const score = Game.snakePositions.length.toString();
+		const score = Game.snakePositions.length;
+		const formattedScore = score.toString();
 
-		localStorage.setItem("last-score", score);
+		if (Number.parseInt(localScore ?? "0") < score) {
+			localStorage.setItem("high-score", formattedScore);
+			highScore.textContent = formattedScore;
+		}
 
-		gameScore.textContent = score;
-		lastScore.textContent = score;
-
+		gameScore.textContent = formattedScore;
 		gameOverDialog.showModal();
+
 		return;
 	}
 
 	if (!Game.isRunning) {
-		console.info("Stopping the game...");
-
 		cancelFrame();
 		clear();
-		render();
 
 		return;
 	}
@@ -111,30 +109,6 @@ function tick() {
  * @returns {void}
  */
 function update() {
-	const headPosition = Game.snakePositions[0];
-
-	if (headPosition[0] === 0) {
-
-		rotate(LEFT_SIDE);
-		headPosition[0] = GRID_SIZE - 1;
-
-	} else if (headPosition[0] === GRID_SIZE - 1) {
-
-		rotate(RIGHT_SIDE);
-		headPosition[0] = 0;
-
-	} else if (headPosition[1] === 0) {
-
-		rotate(TOP_SIDE);
-		headPosition[1] = GRID_SIZE - 1;
-
-	} else if (headPosition[1] === GRID_SIZE - 1) {
-
-		rotate(BOTTOM_SIDE);
-		headPosition[1] = 0;
-
-	}
-
 	move();
 
 	if (Game.isOver) {
@@ -148,20 +122,19 @@ function update() {
  * @returns {void}
  */
 function move() {
-	const pointPosition = moveHead();
+	const atePoint = moveHead();
 
 	for (let i = 1; i < Game.snakePositions.length; i++) {
 		moveBody(i);
 	}
 
-	if (pointPosition) {
+	if (atePoint) {
 		Game.snakePositions.push([...Game.snakePreviousPosition]);
 
 		if (MaxPointIncreaseThreshold.has(Game.snakePositions.length)) {
 			Game.maxPointCount++;
 		}
 
-		set(point, ...Game.snakePositions[0], false);
 		Game.pointCount--;
 	}
 }
@@ -172,7 +145,28 @@ function move() {
 function moveHead() {
 	const position = Game.snakePositions[0];
 
-	set(snake, ...position, false);
+	set(snake, ...position, false, "snake");
+
+	if (position[0] === 0 && Game.direction === LEFT) {
+
+		rotate(LEFT_SIDE);
+		position[0] = GRID_SIZE - 1;
+
+	} else if (position[0] === GRID_SIZE - 1 && Game.direction === RIGHT) {
+
+		rotate(RIGHT_SIDE);
+		position[0] = 0;
+
+	} else if (position[1] === 0 && Game.direction === TOP) {
+
+		rotate(TOP_SIDE);
+		position[1] = GRID_SIZE - 1;
+
+	} else if (position[1] === GRID_SIZE - 1 && Game.direction === BOTTOM) {
+
+		rotate(BOTTOM_SIDE);
+		position[1] = 0;
+	}
 
 	Game.snakePreviousPosition[0] = position[0];
 	Game.snakePreviousPosition[1] = position[1];
@@ -196,9 +190,15 @@ function moveHead() {
 		Game.isOver = true;
 	}
 
-	set(snake, ...position, true);
+	set(snake, ...position, true, "snake");
 
-	return get(point, ...position);
+	const atePoint = get(point, ...position);
+
+	if (atePoint) {
+		set(point, ...position, false, "snake");
+	}
+
+	return atePoint;
 }
 
 /**
@@ -210,12 +210,12 @@ function moveBody(index) {
 
 	const currentCopy = [...current];
 
-	set(snake, ...current, false);
+	set(snake, ...current, false, "snake");
 
 	current[0] = Game.snakePreviousPosition[0];
 	current[1] = Game.snakePreviousPosition[1];
 
-	set(snake, ...current, true);
+	set(snake, ...current, true, "snake");
 
 	Game.snakePreviousPosition[0] = currentCopy[0];
 	Game.snakePreviousPosition[1] = currentCopy[1];
@@ -257,7 +257,7 @@ function spawnPoint() {
 				continue;
 			}
 
-			set(point, x, y, true);
+			set(point, x, y, true, "point");
 			Game.pointCount++;
 
 			return;
@@ -270,7 +270,7 @@ function spawnPoint() {
  * @returns {void}
  */
 function rotate(side) {
-	cube.style.transition = "transform ease-in 1s";
+	cube.style.transition = `transform ease-in ${ROTATION_DURATION}ms`;
 
 	switch (side) {
 		case FRONT_SIDE:
@@ -301,32 +301,9 @@ function rotate(side) {
 
 	setTimeout(() => {
 		cube.style.transformOrigin = "center"
-		cube.style.transition = "none";
+		cube.style.transition = "";
 		cube.style.transform = "";
-	}, 1_150);
-}
-
-/**
- * @returns {void}
- */
-function render() {
-	for (let x = 0; x < GRID_SIZE; x++) {
-		for (let y = 0; y < GRID_SIZE; y++) {
-			for (let z = 0; z < BACK_SIDE + 1; z++) {
-				const cell = /** @type {HTMLElement} */ (document.getElementById(`cell-${z}-${y * GRID_SIZE + x}`));
-
-				if (get(snake, x, y)) {
-					cell.className = "snake";
-					cell.dataset.snake = Game.snakePositions[0][0] === x && Game.snakePositions[0][1] === y ? "head" : "body";
-					cell.dataset.direction = Game.direction === TOP ? "top" : Game.direction === RIGHT ? "right" : Game.direction === BOTTOM ? "bottom" : "left";
-				} else if (get(point, x, y)) {
-					cell.className = "point";
-				} else {
-					cell.className = "";
-				}
-			}
-		}
-	}
+	}, ROTATION_DURATION * 1.15);
 }
 
 /**
@@ -335,8 +312,8 @@ function render() {
 function clear() {
 	for (let x = 0; x < GRID_SIZE; x++) {
 		for (let y = 0; y < GRID_SIZE; y++) {
-			set(snake, x, y, false);
-			set(point, x, y, false);
+			set(snake, x, y, false, "snake");
+			set(point, x, y, false, "point");
 		}
 	}
 }
@@ -355,15 +332,27 @@ function blockInput() {
  * @param {number} x
  * @param {number} y
  * @param {boolean} toggle
+ * @param {string} className
  * @returns {void}
  */
-function set(state, x, y, toggle) {
+function set(state, x, y, toggle, className) {
 	const [index, bit] = getCellBitIndex(x, y);
 
 	if (toggle) {
 		state[index] |= 1 << bit; // Set the bit
 	} else {
 		state[index] &= ~(1 << bit); // Clear the bit
+	}
+
+	for (let z = 0; z < BACK_SIDE + 1; z++) {
+		const cell = /** @type {HTMLElement} */ (document.getElementById(`cell-${z}-${y * GRID_SIZE + x}`));
+
+		cell.className = toggle ? className : "";
+		cell.dataset.direction = Game.direction === TOP ? "top" : Game.direction === RIGHT ? "right" : Game.direction === BOTTOM ? "bottom" : "left";
+
+		if (className === "snake" && Game.snakePositions[0]) {
+			cell.dataset.snake = toggle ? Game.snakePositions[0][0] === x && Game.snakePositions[0][1] === y ? "head" : "body" : "none";
+		}
 	}
 }
 
@@ -403,20 +392,52 @@ function toggleGame(toggle) {
 	}
 }
 
+/**
+ * Setup HTML
+ */
 const gameOverDialog = /** @type {HTMLDialogElement} */ (document.getElementById("game-over-dialog"));
-const lastScore = /** @type {HTMLElement} */ (document.getElementById("last-score"));
+const highScore = /** @type {HTMLElement} */ (document.getElementById("high-score"));
 const gameScore = /** @type {HTMLElement} */ (document.getElementById("game-score"));
-const startButton = /** @type {HTMLButtonElement} */ (document.getElementById("start-button"));
-const cube = /** @type {HTMLDivElement} */ (document.getElementById("cube"));
 
-const localScore = localStorage.getItem("last-score");
+const cube = /** @type {HTMLDivElement} */ (document.getElementById("cube"));
+const startButton = document.createElement("button");
+
+startButton.id = "start-button";
+startButton.type = "button";
+startButton.textContent = "Start";
+
+cube.innerHTML = "";
+cube.style.setProperty("--grid-size", GRID_SIZE.toString());
+cube.style.setProperty("--cell-size", `${(1 + 8 / GRID_SIZE).toFixed(2)}rem`);
+
+for (let i = 0; i <= BACK_SIDE; i++) {
+	const grid = document.createElement("ol");
+
+	grid.id = `grid-${i}`;
+	grid.className = "game-grid";
+
+	for (let j = 0; j < GRID_SIZE * GRID_SIZE; j++) {
+		const cell = document.createElement("li");
+
+		cell.id = `cell-${i}-${j}`;
+		grid.append(cell);
+	}
+
+	if (i === 0) {
+		grid.append(startButton);
+	}
+
+	cube.append(grid);
+}
+
+const localScore = localStorage.getItem("high-score");
 
 if (localScore) {
-	lastScore.textContent = localScore;
+	highScore.textContent = localScore;
 }
 
 gameOverDialog.addEventListener("close", () => {
-	render();
+	clear();
 	toggleGame(false);
 });
 
